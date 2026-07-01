@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Mathe Casino – Taktiken</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --felt:#0D2B1F;--felt-l:#133728;--gold:#C9A84C;--gold-l:#E8C96A;
+  --ivory:#F5F0E8;--red:#B03030;--blue:#1B4F8A;--text:#E8DFC8;--dim:#8A7D60;
+}
+body{background:var(--felt);font-family:'Inter',sans-serif;color:var(--text);min-height:100vh;}
+/* Header */
+.hdr{background:var(--felt);border-bottom:2px solid var(--gold);padding:14px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10;}
+.hdr-title{font-family:'Playfair Display',serif;font-size:20px;font-weight:900;color:var(--gold);letter-spacing:2px;text-transform:uppercase;}
+.hdr-sub{font-size:11px;color:var(--dim);letter-spacing:1px;}
+/* Nav */
+.nav{display:flex;background:var(--felt-l);border-bottom:1px solid #C9A84C33;}
+.nav-btn{flex:1;padding:13px 6px;background:none;border:none;cursor:pointer;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;color:var(--dim);border-bottom:3px solid transparent;transition:all .2s;-webkit-tap-highlight-color:transparent;}
+.nav-btn.active{color:var(--gold);border-bottom-color:var(--gold);background:var(--felt);}
+/* Content */
+.content{max-width:620px;margin:0 auto;padding:18px 14px;}
+/* Panel */
+.panel{background:var(--felt-l);border:1px solid #C9A84C33;border-radius:12px;padding:18px;margin-bottom:14px;}
+.p-title{font-family:'Playfair Display',serif;font-size:18px;color:var(--gold);margin-bottom:3px;}
+.p-sub{font-size:12px;color:var(--dim);margin-bottom:14px;}
+/* Insight */
+.insight{background:#0a1f16;border-left:3px solid var(--gold);border-radius:0 8px 8px 0;padding:12px 16px;margin-top:14px;font-size:13px;line-height:1.65;color:var(--text);}
+.insight strong{color:var(--gold);}
+.formula{background:#0a1f16;border:1px solid #C9A84C33;border-radius:8px;padding:9px 13px;font-family:monospace;font-size:13px;color:var(--gold-l);margin:8px 0;letter-spacing:.5px;}
+/* Stats / tables */
+.stat-row{display:flex;gap:10px;margin:12px 0;flex-wrap:wrap;}
+.stat-box{flex:1;min-width:70px;background:#0a1f16;border-radius:8px;padding:10px;text-align:center;}
+.stat-num{font-size:20px;font-weight:700;color:var(--gold);}
+.stat-lbl{font-size:10px;color:var(--dim);margin-top:2px;text-transform:uppercase;letter-spacing:.5px;}
+/* Strategy step */
+.step{display:flex;gap:12px;margin-bottom:14px;align-items:flex-start;}
+.step-num{flex-shrink:0;width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--gold-l));color:#1a1000;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;}
+.step-body{flex:1;}
+.step-title{font-weight:700;font-size:14px;color:var(--text);margin-bottom:3px;}
+.step-text{font-size:13px;line-height:1.6;color:var(--text);opacity:.9;}
+/* Table */
+.tbl{width:100%;border-collapse:collapse;margin:10px 0;font-size:12.5px;}
+.tbl th{background:#0a1f16;color:var(--gold);font-weight:700;padding:8px 10px;text-align:left;border-bottom:2px solid var(--gold);}
+.tbl td{padding:7px 10px;border-bottom:1px solid #C9A84C22;}
+.tbl tr:nth-child(even) td{background:#0a1f1655;}
+/* Tag */
+.tag{display:inline-block;background:#0a1f16;border:1px solid var(--gold);color:var(--gold);font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:99px;letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px;}
+.divider{height:1px;background:linear-gradient(90deg,transparent,#C9A84C55,transparent);margin:16px 0;}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div>
+    <div class="hdr-title">Taktik &amp; Mathematik</div>
+    <div class="hdr-sub">Wie man Wahrscheinlichkeiten für sich nutzt</div>
+  </div>
+</div>
+<nav class="nav">
+  <button class="nav-btn active" onclick="showTab('dice',this)">🎲 Würfel</button>
+  <button class="nav-btn" onclick="showTab('roulette',this)">🎡 Roulette</button>
+  <button class="nav-btn" onclick="showTab('cards',this)">🃏 Karten</button>
+</nav>
+<div class="content">
+
+  <!-- DICE -->
+  <div id="tab-dice">
+    <div class="panel">
+      <div class="tag">Laplace-Wahrscheinlichkeit</div>
+      <div class="p-title">🎲 Warum gewinnt die Bank beim Würfeln?</div>
+      <div class="p-sub">Zwei Würfel, 36 mögliche Kombinationen – aber nicht jede Summe ist gleich wahrscheinlich.</div>
+
+      <p class="step-text">Bei zwei Würfeln gibt es 6 × 6 = 36 gleich wahrscheinliche Kombinationen (Laplace-Experiment). Die Summe 7 entsteht aus 6 dieser Kombinationen (1+6, 2+5, 3+4, 4+3, 5+2, 6+1), während die Summe 2 nur aus einer einzigen Kombination entsteht (1+1). Genau das macht die Mitte der Verteilung so viel wahrscheinlicher als die Ränder.</p>
+
+      <div class="formula">P(Summe = k) = Anzahl der Kombinationen für k / 36</div>
+
+      <table class="tbl">
+        <tr><th>Summe</th><th>Kombinationen</th><th>P(Summe)</th><th>Faire Quote</th></tr>
+        <tr><td>2 / 12</td><td>1</td><td>2,8 %</td><td>35:1</td></tr>
+        <tr><td>3 / 11</td><td>2</td><td>5,6 %</td><td>17:1</td></tr>
+        <tr><td>4 / 10</td><td>3</td><td>8,3 %</td><td>11:1</td></tr>
+        <tr><td>5 / 9</td><td>4</td><td>11,1 %</td><td>8:1</td></tr>
+        <tr><td>6 / 8</td><td>5</td><td>13,9 %</td><td>6,2:1</td></tr>
+        <tr><td>7</td><td>6</td><td>16,7 %</td><td>5:1</td></tr>
+      </table>
+
+      <div class="insight">
+        <strong>Der Trick der Bank:</strong><br/>
+        Bei einer fairen Auszahlung müsste die Bank bei der Summe 7 genau 5:1 zahlen, damit sich Einsatz und Erwartungswert die Waage halten. Im echten Casino wird aber oft nur 4:1 ausgezahlt – die Differenz ist der Hausvorteil.
+        <div class="formula">Erwartungswert E = P(Gewinn) × Auszahlung − P(Verlust) × Einsatz</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="p-title">Taktik-Tipps</div>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Auf die Mitte setzen, wenn die Quote stimmt</div>
+          <div class="step-text">Die Summe 7 ist am wahrscheinlichsten – aber das bedeutet nur, dass du <em>häufiger</em> triffst, nicht dass du auf Dauer gewinnst. Vergleiche immer die echte Wahrscheinlichkeit mit der angebotenen Auszahlung.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Randwetten meiden, außer bei hoher Quote</div>
+          <div class="step-text">Die Summen 2 und 12 treffen nur in 1 von 36 Würfen – das ist unter 3 %. Eine Wette darauf lohnt sich nur, wenn die Auszahlung mindestens 35:1 beträgt.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">Langfristig verliert die Bank nie</div>
+          <div class="step-text">Egal worauf du setzt: Der Erwartungswert ist über viele Würfe hinweg immer leicht negativ für dich. Mathematik schlägt hier kein Bauchgefühl – nur kürzere Spielsitzungen begrenzen den erwarteten Verlust.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROULETTE -->
+  <div id="tab-roulette" style="display:none;">
+    <div class="panel">
+      <div class="tag">Klassische Wahrscheinlichkeit · Gegenereignis</div>
+      <div class="p-title">🎡 Der Null-Trick beim Roulette</div>
+      <div class="p-sub">Warum ist Rot/Schwarz kein faires 50/50-Spiel?</div>
+
+      <p class="step-text">Ein europäisches Roulette-Rad hat 37 Felder: 18 rote, 18 schwarze und die grüne 0. Ohne die 0 wäre P(Rot) = 18/36 = 50 % – ein faires Spiel. Mit der 0 sinkt die Wahrscheinlichkeit auf 18/37 ≈ 48,6 %. Dieser kleine Unterschied ist der komplette Hausvorteil.</p>
+
+      <div class="formula">P(Rot) = 18/37 ≈ 48,6 %&nbsp;&nbsp;|&nbsp;&nbsp;P(Gegenereignis Nicht-Rot) = 19/37 ≈ 51,4 %</div>
+
+      <table class="tbl">
+        <tr><th>Wettart</th><th>Treffer</th><th>P(Treffen)</th><th>Auszahlung</th><th>Hausvorteil</th></tr>
+        <tr><td>Einzelne Zahl</td><td>1 von 37</td><td>2,7 %</td><td>35:1</td><td>≈ 2,7 %</td></tr>
+        <tr><td>Farbe (Rot/Schwarz)</td><td>18 von 37</td><td>48,6 %</td><td>1:1</td><td>≈ 2,7 %</td></tr>
+        <tr><td>Dutzend</td><td>12 von 37</td><td>32,4 %</td><td>2:1</td><td>≈ 2,7 %</td></tr>
+        <tr><td>Grün (0)</td><td>1 von 37</td><td>2,7 %</td><td>35:1 (fair)</td><td>≈ 2,7 %</td></tr>
+      </table>
+
+      <div class="insight">
+        <strong>Das Erstaunliche:</strong><br/>
+        Egal auf welches Feld du setzt – der Hausvorteil bleibt bei allen einfachen Außenwetten praktisch identisch (≈ 2,7 %), weil ihn die einzelne grüne 0 verursacht und nicht die Anzahl der Felder, auf die du setzt.
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="p-title">Taktik-Tipps</div>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Es gibt kein "besseres" Feld</div>
+          <div class="step-text">Weil der Hausvorteil bei (fast) jeder Wettart gleich ist, ändert die Wahl der Wettart nichts am erwarteten Verlust pro Einsatz – nur die Schwankungsbreite (Varianz) ändert sich.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Hohe Auszahlung = hohes Risiko</div>
+          <div class="step-text">Auf eine einzelne Zahl zu setzen bringt selten einen Treffer (2,7 %), dafür eine hohe Auszahlung (35:1). Das ist mathematisch gesehen kein "besseres" Geschäft – nur ein anderes Risikoprofil mit größeren Schwankungen.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">Mehrere gleichzeitige Wetten verändern den Erwartungswert nicht</div>
+          <div class="step-text">Wetten zu kombinieren (z. B. Zahl + Farbe + Dutzend) erhöht zwar die Trefferchance pro Runde, summiert sich aber im Erwartungswert nicht zu einem Vorteil – jede einzelne Wette bleibt für sich genommen leicht im Minus.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CARDS -->
+  <div id="tab-cards" style="display:none;">
+    <div class="panel">
+      <div class="tag">Bedingte Wahrscheinlichkeit · ohne Zurücklegen</div>
+      <div class="p-title">🃏 Kartenzählen verstehen</div>
+      <div class="p-sub">Wie sich Wahrscheinlichkeiten mit jeder gezogenen Karte verändern.</div>
+
+      <p class="step-text">Beim Ziehen ohne Zurücklegen verändert jede gezogene Karte die Zusammensetzung des restlichen Stapels – und damit die Wahrscheinlichkeit für die nächste Karte. Das ist der Kern der <strong>bedingten Wahrscheinlichkeit</strong>.</p>
+
+      <div class="formula">P(Ass | bereits 1 Ass gezogen) = 3/51 ≈ 5,9 % &nbsp;(statt 4/52 ≈ 7,7 % am Anfang)</div>
+
+      <table class="tbl">
+        <tr><th>Situation</th><th>Restkarten</th><th>Verbleibende Asse</th><th>P(nächstes Ass)</th></tr>
+        <tr><td>Frischer Stapel</td><td>52</td><td>4</td><td>7,7 %</td></tr>
+        <tr><td>1 Ass bereits gezogen</td><td>51</td><td>3</td><td>5,9 %</td></tr>
+        <tr><td>2 Asse bereits gezogen</td><td>50</td><td>2</td><td>4,0 %</td></tr>
+        <tr><td>3 Asse bereits gezogen</td><td>49</td><td>1</td><td>2,0 %</td></tr>
+      </table>
+
+      <div class="insight">
+        <strong>Hi-Lo-System (vereinfacht):</strong><br/>
+        Beim Blackjack-Kartenzählen vergibt man Punkte: niedrige Karten (2–6) zählen +1, hohe Karten (10, Bild, Ass) zählen −1, mittlere Karten (7–9) zählen 0. Ein hoher positiver Zählerstand bedeutet: viele hohe Karten sind noch im Stapel – das erhöht statistisch die Chance auf gute Blackjack-Hände für den Spieler.
+        <div class="formula">Running Count = Σ (Kartenwerte: +1 / 0 / −1)</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="p-title">Taktik-Tipps</div>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Wahrscheinlichkeiten live mitrechnen</div>
+          <div class="step-text">Bei jeder gezogenen Karte kannst du die Wahrscheinlichkeit für die nächste neu berechnen: Treffer im Restdeck geteilt durch Restdeck-Größe. Das ist der mathematische Kern jeder Zählstrategie.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Je leerer der Stapel, desto größer der Effekt</div>
+          <div class="step-text">Bei einem fast leeren Stapel verändert jede einzelne Karte die Wahrscheinlichkeiten stark (siehe Tabelle: von 7,7 % auf 2,0 % bei nur 3 gezogenen Assen). Bei einem vollen Stapel mit 6 Decks ist der Effekt einer einzelnen Karte viel kleiner.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">Kartenzählen ist kein Betrug, aber riskant</div>
+          <div class="step-text">Mathematisch ist Kartenzählen lediglich korrektes bedingtes Wahrscheinlichkeitsrechnen – kein Eingriff ins Spiel. In echten Casinos ist es aber unerwünscht und kann zum Hausverbot führen.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function showTab(name, btn) {
+  ["dice","roulette","cards"].forEach(t => {
+    document.getElementById("tab-"+t).style.display = t===name?"":"none";
+  });
+  document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+}
+</script>
+</body>
+</html>
