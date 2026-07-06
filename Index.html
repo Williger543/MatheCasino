@@ -89,6 +89,7 @@ body{background:var(--felt);font-family:'Inter',sans-serif;color:var(--text);min
 /* Sum buttons */
 .sum-grid{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;}
 .sum-btn{width:38px;height:38px;border-radius:8px;border:none;cursor:pointer;font-weight:700;font-size:13px;transition:all .15s;-webkit-tap-highlight-color:transparent;}
+.sum-btn:disabled{opacity:.35;cursor:not-allowed;}
 /* Hist bars */
 .hist-wrap{margin-top:12px;}
 .hist-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;}
@@ -182,15 +183,18 @@ body{background:var(--felt);font-family:'Inter',sans-serif;color:var(--text);min
   <div id="tab-dice">
     <div class="panel">
       <div class="p-title">🎲 Zwei Würfel</div>
-      <div class="p-sub">Tippe eine Summe – dann würfle. Warum ist die 7 so mächtig?</div>
+      <div class="p-sub">Wähle Einsatz und Summe – dann würfle. Warum ist die 7 so mächtig?</div>
       <div class="dice-row">
         <div class="die" id="d1"></div>
         <div class="die" id="d2"></div>
       </div>
-      <div style="font-size:12px;color:var(--dim);margin-bottom:8px;">Setze auf eine Summe (1 Chip):</div>
+      <div style="font-size:12px;color:var(--dim);margin-bottom:8px;">Einsatz wählen (Chips):</div>
+      <div class="sum-grid" id="stakeBtns"></div>
+      <div style="font-size:12px;color:var(--dim);margin-bottom:8px;">Setze auf eine Summe:</div>
       <div class="sum-grid" id="sumBtns"></div>
       <div id="diceResult" style="min-height:32px;"></div>
       <button class="btn-g" id="rollBtn" onclick="rollDice()" disabled>Würfeln – wähle erst eine Summe</button>
+      <div id="diceCooldownNote" style="display:none;font-size:12px;color:var(--dim);margin-top:10px;line-height:1.5;"></div>
     </div>
     <div class="panel" id="diceStats" style="display:none;">
       <div style="font-size:14px;font-weight:600;margin-bottom:10px;" id="rollCount">Nach 0 Würfen:</div>
@@ -203,6 +207,8 @@ body{background:var(--felt);font-family:'Inter',sans-serif;color:var(--text);min
     <div class="panel">
       <div class="p-title">🎡 Roulette</div>
       <div class="p-sub">Erkunde, wie das Null-Feld die Bank reich macht. Du kannst mehrere Wetten gleichzeitig setzen.</div>
+      <div style="font-size:12px;color:var(--dim);margin-bottom:8px;">Einsatz pro Wette (Chips):</div>
+      <div class="sum-grid" id="roulStakeBtns"></div>
       <div class="wheel-wrap">
         <div class="wheel-stage">
           <div class="wheel-pointer"></div>
@@ -236,6 +242,8 @@ body{background:var(--felt);font-family:'Inter',sans-serif;color:var(--text);min
     <div class="panel">
       <div class="p-title">🃏 Karten ziehen</div>
       <div class="p-sub">Wie ändert sich die Wahrscheinlichkeit nach jedem Zug?</div>
+      <div style="font-size:12px;color:var(--dim);margin-bottom:8px;">Einsatz pro Zug (Chips):</div>
+      <div class="sum-grid" id="cardStakeBtns"></div>
       <div style="font-size:12px;color:var(--dim);margin-bottom:6px;">Deine Wette:</div>
       <div id="cardBetArea"></div>
       <div id="cardProbArea"></div>
@@ -296,13 +304,24 @@ const RED_NUMS = new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
 
 // Dice
 let diceBet = null;
+let diceBetAmount = 1;
+const STAKE_OPTIONS = [1,2,5,10,25];
 let diceHistory = [];
 let diceRolls = 0;
+
+// Würfel-Spamschutz: zu viele Würfe in kurzer Zeit lösen eine 10-Minuten-Pause aus
+let diceRollTimestamps = [];
+const DICE_SPAM_WINDOW_MS = 90*1000;   // Beobachtungsfenster: 90 Sekunden
+const DICE_SPAM_LIMIT = 25;            // ab so vielen Würfen im Fenster greift die Pause
+const DICE_COOLDOWN_MS = 10*60*1000;   // Dauer der Pause: 10 Minuten
+let diceCooldownUntil = 0;
+let diceCooldownTimer = null;
 
 // Roulette
 let roulBetType = "number";
 let roulSelected = null;
-let activeBets = []; // [{type:'number'|'color'|'dozen', value, payout}]
+let roulBetAmount = 1;
+let activeBets = []; // [{type:'number'|'color'|'dozen', value, payout, stake}]
 let roulStats = {red:0,black:0,green:0,total:0};
 
 // Cards
@@ -311,7 +330,33 @@ const VALUES = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
 let deck = [];
 let drawnCards = [];
 let cardBet = null;
+let cardBetAmount = 1;
 let cardStats = {wins:0,total:0};
+
+// ── Wiederverwendbare Einsatz-Auswahl (Roulette & Karten) ───────────────────────
+function buildStakeSelector(containerId, prefix, getAmt, onSelect){
+  const wrap = document.getElementById(containerId);
+  STAKE_OPTIONS.forEach(amt=>{
+    const b = document.createElement("button");
+    b.className = "sum-btn";
+    b.textContent = amt;
+    b.id = prefix+amt;
+    b.style.width = "auto";
+    b.style.padding = "0 14px";
+    b.style.background = amt===getAmt() ? "var(--gold)" : "#0a1f16";
+    b.style.color = amt===getAmt() ? "#1a1000" : "var(--text)";
+    b.onclick = () => onSelect(amt);
+    wrap.appendChild(b);
+  });
+}
+function refreshStakeSelector(prefix, amt){
+  STAKE_OPTIONS.forEach(a=>{
+    const b=document.getElementById(prefix+a);
+    if(!b) return;
+    b.style.background = a===amt ? "var(--gold)" : "#0a1f16";
+    b.style.color = a===amt ? "#1a1000" : "var(--text)";
+  });
+}
 
 const CARD_BETS = [
   {key:"ace",label:"Nächste = Ass",p:"4/52 ≈ 7,7 %",payout:10},
@@ -393,10 +438,39 @@ function showTab(name, btn) {
     b.onclick = () => selectSum(n);
     wrap.appendChild(b);
   }
+  const stakeWrap = document.getElementById("stakeBtns");
+  STAKE_OPTIONS.forEach(amt=>{
+    const b = document.createElement("button");
+    b.className = "sum-btn";
+    b.textContent = amt;
+    b.id = "stb-"+amt;
+    b.style.width = "auto";
+    b.style.padding = "0 14px";
+    b.style.background = amt===diceBetAmount ? "var(--gold)" : "#0a1f16";
+    b.style.color = amt===diceBetAmount ? "#1a1000" : "var(--text)";
+    b.onclick = () => selectStake(amt);
+    stakeWrap.appendChild(b);
+  });
 })();
 
+function selectStake(amt){
+  if(Date.now() < diceCooldownUntil) return;
+  diceBetAmount = amt;
+  STAKE_OPTIONS.forEach(a=>{
+    const b = document.getElementById("stb-"+a);
+    b.style.background = a===amt ? "var(--gold)" : "#0a1f16";
+    b.style.color = a===amt ? "#1a1000" : "var(--text)";
+  });
+  if(diceBet!==null){
+    const btn = document.getElementById("rollBtn");
+    const enough = totalChips>=diceBetAmount;
+    btn.disabled = !enough;
+    btn.textContent = enough ? "Würfeln (Einsatz: "+diceBetAmount+")" : "Nicht genug Chips für diesen Einsatz";
+  }
+}
+
 function selectSum(n){
-  if(totalChips<=0) return;
+  if(totalChips<=0 || Date.now()<diceCooldownUntil) return;
   diceBet = n;
   for(let i=2;i<=12;i++){
     const b = document.getElementById("sb-"+i);
@@ -404,16 +478,18 @@ function selectSum(n){
     b.style.color = i===n ? "#1a1000" : "var(--text)";
   }
   const btn = document.getElementById("rollBtn");
-  btn.disabled = false;
-  btn.textContent = "Würfeln (Einsatz: "+n+")";
+  const enough = totalChips>=diceBetAmount;
+  btn.disabled = !enough;
+  btn.textContent = enough ? "Würfeln (Einsatz: "+diceBetAmount+")" : "Nicht genug Chips für diesen Einsatz";
 }
 
 function rollDice(){
-  if(diceBet===null||totalChips<=0) return;
+  if(diceBet===null || totalChips<diceBetAmount || Date.now()<diceCooldownUntil) return;
   const d1el = document.getElementById("d1");
   const d2el = document.getElementById("d2");
   d1el.classList.add("rolling"); d2el.classList.add("rolling");
   document.getElementById("diceResult").innerHTML="";
+  document.getElementById("rollBtn").disabled = true;
   // flicker random faces while "rolling" for a tumbling feel
   let flickers=0;
   const flickerTimer=setInterval(()=>{
@@ -432,13 +508,60 @@ function rollDice(){
     diceHistory.push(sum);
     if(diceHistory.length>60) diceHistory.shift();
     const won = diceBet===sum;
-    const payout = Math.round(36/THEORY[diceBet]-1);
-    const delta = won ? payout : -1;
+    const payout = Math.round(36/THEORY[diceBet]-1) * diceBetAmount;
+    const delta = won ? payout : -diceBetAmount;
     changeChips(delta);
     document.getElementById("diceResult").innerHTML =
-      `<span class="badge ${won?"win":"lose"}">${won?"✓ Gewonnen! +"+payout+" Chips":"✗ Verloren – Summe war "+sum}</span>`;
+      `<span class="badge ${won?"win":"lose"}">${won?"✓ Gewonnen! +"+payout+" Chips":"✗ Verloren – Summe war "+sum+" (-"+diceBetAmount+")"}</span>`;
     renderDiceStats();
+    registerDiceRoll();
   },550);
+}
+
+function registerDiceRoll(){
+  const now = Date.now();
+  diceRollTimestamps.push(now);
+  diceRollTimestamps = diceRollTimestamps.filter(t => now-t < DICE_SPAM_WINDOW_MS);
+  if(diceRollTimestamps.length >= DICE_SPAM_LIMIT){
+    startDiceCooldown();
+    return;
+  }
+  document.getElementById("rollBtn").disabled = diceBet===null || totalChips<diceBetAmount;
+}
+
+function startDiceCooldown(){
+  diceCooldownUntil = Date.now() + DICE_COOLDOWN_MS;
+  diceRollTimestamps = [];
+  if(diceCooldownTimer) clearInterval(diceCooldownTimer);
+  updateDiceCooldownUI();
+  diceCooldownTimer = setInterval(updateDiceCooldownUI, 1000);
+}
+
+function updateDiceCooldownUI(){
+  const remaining = diceCooldownUntil - Date.now();
+  const btn = document.getElementById("rollBtn");
+  const note = document.getElementById("diceCooldownNote");
+  const sumBtnsEls = document.querySelectorAll("#sumBtns .sum-btn");
+  const stakeBtnsEls = document.querySelectorAll("#stakeBtns .sum-btn");
+
+  if(remaining<=0){
+    if(diceCooldownTimer){ clearInterval(diceCooldownTimer); diceCooldownTimer=null; }
+    diceCooldownUntil = 0;
+    sumBtnsEls.forEach(b=>b.disabled=false);
+    stakeBtnsEls.forEach(b=>b.disabled=false);
+    btn.disabled = diceBet===null || totalChips<diceBetAmount;
+    btn.textContent = diceBet===null ? "Würfeln – wähle erst eine Summe" : "Würfeln (Einsatz: "+diceBetAmount+")";
+    note.style.display="none";
+    return;
+  }
+  const mins = Math.floor(remaining/60000);
+  const secs = Math.floor((remaining%60000)/1000);
+  btn.disabled = true;
+  sumBtnsEls.forEach(b=>b.disabled=true);
+  stakeBtnsEls.forEach(b=>b.disabled=true);
+  btn.textContent = "⏳ Pause: "+mins+":"+String(secs).padStart(2,"0");
+  note.style.display="";
+  note.textContent = "Du hast sehr schnell hintereinander gewürfelt. Kurze Pause von 10 Minuten (noch "+mins+":"+String(secs).padStart(2,"0")+") – nutze die Zeit, um dir die Verteilung unten anzuschauen und zu überlegen, warum manche Summen wahrscheinlicher sind als andere.";
 }
 
 function renderDiceStats(){
@@ -558,12 +681,13 @@ function renderRoulBetArea(){
 }
 
 function betLabel(bet){
-  if(bet.type==="number") return "Zahl "+bet.value+" ("+bet.payout+":1)";
+  const stakeTxt = " · Einsatz "+bet.stake;
+  if(bet.type==="number") return "Zahl "+bet.value+" ("+bet.payout+":1)"+stakeTxt;
   if(bet.type==="color"){
     const names={red:"Rot",black:"Schwarz",green:"Grün (0)"};
-    return names[bet.value]+" ("+bet.payout+":1)";
+    return names[bet.value]+" ("+bet.payout+":1)"+stakeTxt;
   }
-  return "Dutzend "+((bet.value-1)*12+1)+"–"+(bet.value*12)+" ("+bet.payout+":1)";
+  return "Dutzend "+((bet.value-1)*12+1)+"–"+(bet.value*12)+" ("+bet.payout+":1)"+stakeTxt;
 }
 
 function toggleBet(type,value,payout){
@@ -572,8 +696,8 @@ function toggleBet(type,value,payout){
   if(idx>=0){
     activeBets.splice(idx,1);
   } else {
-    if(totalChips<=0) return; // bei 0 Chips keine neue Wette setzen
-    activeBets.push({type,value,payout});
+    if(totalChips<roulBetAmount) return; // nicht genug Chips für den aktuellen Einsatz
+    activeBets.push({type,value,payout,stake:roulBetAmount});
   }
   // betroffenes Feld direkt golden markieren/entmarkieren, ohne ganzes Board neu zu bauen
   const el = type==="number" ? document.getElementById("rc-"+value)
@@ -648,6 +772,7 @@ function spinRoulette(){
   document.getElementById("spinBtn").disabled=true;
   document.getElementById("spinBtn").textContent="Dreht...";
   document.getElementById("roulResult").innerHTML="";
+  document.querySelectorAll("#roulStakeBtns .sum-btn").forEach(b=>b.disabled=true);
   renderActiveBets(); // zeigt sofort den Sperr-Hinweis und blendet ✕/Löschen aus
 
   // Ergebnis VORHER ziehen (Zufall bestimmt das Ergebnis, Animation zeigt es nur an)
@@ -691,7 +816,7 @@ function spinRoulette(){
       if(bet.type==="number") won = bet.value===n;
       else if(bet.type==="color") won = bet.value===col || (bet.value==="green"&&col==="g") || (bet.value==="red"&&col==="r") || (bet.value==="black"&&col==="b");
       else won = n>=(bet.value-1)*12+1 && n<=bet.value*12;
-      const delta = won ? bet.payout : -1;
+      const delta = won ? bet.payout*bet.stake : -bet.stake;
       totalDelta += delta;
       resultLines.push(`<div style="display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:4px 0;">
         <span>${betLabel(bet)}</span>
@@ -701,6 +826,7 @@ function spinRoulette(){
     changeChips(totalDelta);
     // Wetten bleiben aktiv, damit direkt nochmal gedreht werden kann
     isSpinning = false;
+    document.querySelectorAll("#roulStakeBtns .sum-btn").forEach(b=>b.disabled=false);
     renderActiveBets();
 
     const colBg=col==="r"?"var(--red)":col==="g"?"#2d6a2d":"#1a1a1a";
@@ -723,7 +849,14 @@ function spinRoulette(){
   },4000);
 }
 
+function selectRoulStake(amt){
+  if(isSpinning) return;
+  roulBetAmount = amt;
+  refreshStakeSelector("rst-", amt);
+}
+
 // init roulette area
+buildStakeSelector("roulStakeBtns", "rst-", ()=>roulBetAmount, selectRoulStake);
 setRoulBet("number", document.getElementById("rb-number"));
 renderActiveBets();
 
@@ -739,11 +872,20 @@ function freshDeck(){
   return d;
 }
 
+function selectCardStake(amt){
+  cardBetAmount = amt;
+  refreshStakeSelector("cst-", amt);
+  document.getElementById("drawBtn").disabled = !cardBet || deck.length===0 || totalChips<cardBetAmount;
+}
+
 function initCards(){
   deck=freshDeck(); drawnCards=[];
   document.getElementById("drawnCards").innerHTML="";
   document.getElementById("deckEmpty").style.display="none";
   document.getElementById("flightZone").innerHTML="";
+  if(!document.getElementById("cst-1")){
+    buildStakeSelector("cardStakeBtns", "cst-", ()=>cardBetAmount, selectCardStake);
+  }
   renderCardBets();
   renderCardProb();
   updateDeckStackVisual();
@@ -771,7 +913,7 @@ function selectCardBet(key){
   cardBet=key;
   renderCardBets();
   renderCardProb();
-  document.getElementById("drawBtn").disabled = deck.length===0 || totalChips<=0;
+  document.getElementById("drawBtn").disabled = deck.length===0 || totalChips<cardBetAmount;
   document.getElementById("cardResult").innerHTML="";
 }
 
@@ -793,7 +935,7 @@ function renderCardProb(){
 }
 
 function drawCard(){
-  if(!cardBet||deck.length===0||totalChips<=0) return;
+  if(!cardBet||deck.length===0||totalChips<cardBetAmount) return;
   const card=deck.shift();
   drawnCards=[...drawnCards.slice(-4),card];
   const isRed=card.s==="♥"||card.s==="♦";
@@ -805,7 +947,7 @@ function drawCard(){
   else if(cardBet==="red") won=isRed;
   else won=!isRed;
   const opt=CARD_BETS.find(o=>o.key===cardBet);
-  const payout=won?opt.payout:-1;
+  const payout=won?opt.payout*cardBetAmount:-cardBetAmount;
 
   // Flug-/Flip-Animation: Karte fliegt vom Stapel in die Flugzone und dreht sich um
   const zone=document.getElementById("flightZone");
@@ -829,7 +971,7 @@ function drawCard(){
       wrap.appendChild(el);
     });
     document.getElementById("cardResult").innerHTML=
-      `<span class="badge ${won?"win":"lose"}">${card.v}${card.s} — ${won?"✓ +"+payout+" Chips":"✗ -1 Chip"}</span>`;
+      `<span class="badge ${won?"win":"lose"}">${card.v}${card.s} — ${won?"✓ +"+payout+" Chips":"✗ -"+cardBetAmount+" Chip(s)"}</span>`;
     renderCardProb();
     if(deck.length===0){
       document.getElementById("drawBtn").disabled=true;
@@ -859,7 +1001,7 @@ function resetDeck(){
   document.getElementById("deckEmpty").style.display="none";
   document.getElementById("cardResult").innerHTML="";
   document.getElementById("flightZone").innerHTML="";
-  if(cardBet) document.getElementById("drawBtn").disabled = totalChips<=0;
+  if(cardBet) document.getElementById("drawBtn").disabled = totalChips<cardBetAmount;
   renderCardProb();
   updateDeckStackVisual();
 }
